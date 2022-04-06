@@ -8,7 +8,7 @@ var (
 	Subchunk2ID      = []byte{0x64, 0x61, 0x74, 0x61} // DATA
 )
 
-type Frame float64
+type Sample float64
 
 /*
 ╔════════╤════════════════╤══════╤═══════════════════════════════════════════════════╗
@@ -52,22 +52,12 @@ type Frame float64
 ╚════════╧════════════════╧══════╧═══════════════════════════════════════════════════╝
 */
 
-// Wave represents an entire .wav audio file
-type Wave struct {
-	WaveHeader
-	WaveFmt
-	WaveData
-}
-
 // WaveHeader describes the header each WAVE file should start with
 type WaveHeader struct {
 	ChunkID   []byte // should be RIFF on little-endian or RIFX on big-endian systems..
 	ChunkSize int
 	Format    string // sanity-check, should be WAVE (//TODO: keep as []byte?)
-}
 
-// WaveFmt describes the format of the sound-information in the data subchunks
-type WaveFmt struct {
 	Subchunk1ID    []byte // should contain "fmt"
 	Subchunk1Size  int    // 16 for PCM
 	AudioFormat    int    // PCM = 1 (Linear Quantization), if not 1, compression was used.
@@ -78,35 +68,13 @@ type WaveFmt struct {
 	BitsPerSample  int    // 8 bits = 8, 16 bits = 16, .. :-)
 	ExtraParamSize int    // if not PCM, can contain extra params
 	ExtraParams    []byte // the actual extra params.
-}
 
-// WaveData contains the raw sound data
-type WaveData struct {
 	Subchunk2ID   []byte // Identifier of subchunk
 	Subchunk2Size int    // size of raw sound data
-	RawData       []byte // raw sound data itself
-	Frames        []Frame
+
 }
 
-// NewWaveFmt can be used to generate a complete WaveFmt by calculating the remaining props
-func NewWaveFmt(format, channels, samplerate, bitspersample int, extraparams []byte) WaveFmt {
-	return WaveFmt{
-		Subchunk1ID:    Format,
-		Subchunk1Size:  16, // assume PCM for now
-		AudioFormat:    format,
-		NumChannels:    channels,
-		SampleRate:     samplerate,
-		ByteRate:       samplerate * channels * (bitspersample / 8.0),
-		BlockAlign:     channels * (bitspersample / 8),
-		BitsPerSample:  bitspersample,
-		ExtraParamSize: len(extraparams),
-		ExtraParams:    extraparams,
-	}
-}
-
-// SetChannels changes the FMT to adapt to a new amount of channels
-func (wfmt *WaveFmt) SetChannels(n uint) {
-	wfmt.NumChannels = int(n)
-	wfmt.ByteRate = (wfmt.SampleRate * wfmt.NumChannels * wfmt.BitsPerSample) / 8
-	wfmt.BlockAlign = (wfmt.NumChannels * wfmt.BitsPerSample) / 8
-}
+type (
+	bytesToIntF   func([]byte) int
+	bytesToFloatF func([]byte) float64
+)
