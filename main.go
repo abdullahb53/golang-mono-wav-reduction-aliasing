@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"reflect"
 )
 
 func limitingDegeriGirisi(limit_deger uint8) uint8 {
@@ -42,11 +43,24 @@ func Write(b *[]byte, newFileName string) { //Dosyaya yazma islemi.
 func makeDataArray(taintedLoveArray_b *[]byte, wh *WaveHeader, ss int) *[]byte {
 	//array := make([]byte, 44+((len(*taintedLoveArray_b)-44)/ss))
 
+	var iterasyon int = 8
+	if ss == 2 || ss == 4 || ss == 6 || ss == 8 {
+		iterasyon = 8
+	} else {
+		iterasyon = 32
+	}
+
+	var dataCount uint16 = 0
+	var kalan int = (len((*taintedLoveArray_b)) - 44) % (iterasyon)
+	var diziSonuSorgusu int = ((len((*taintedLoveArray_b)) - 44) - kalan)
+
 	array := []byte{}
 
 	array = append(array, wh.ChunkID...)
-	wh.ChunkSize = ((len(*taintedLoveArray_b) - 44) / ss) + 44 - 8 - 36
-	fmt.Println("wh.ChunkSize", wh.ChunkSize)
+	//wh.ChunkSize = ((len(*taintedLoveArray_b) - 44) / ss) + 44 - 8 - 36
+	//wh.ChunkSize = diziSonuSorgusu/ss + 44
+	wh.ChunkSize = (diziSonuSorgusu/iterasyon)*(iterasyon/ss) + 44
+	//fmt.Println("wh.ChunkSize", wh.ChunkSize)
 	array = append(array, int32ToBytes(wh.ChunkSize)...)
 	array = append(array, []byte(wh.Format)...)
 
@@ -57,10 +71,9 @@ func makeDataArray(taintedLoveArray_b *[]byte, wh *WaveHeader, ss int) *[]byte {
 	wh.NumChannels = wh.NumChannels * wh.BitsPerSample / 8
 	array = append(array, int16ToBytes(wh.NumChannels)...) // NumChannels * BitsPerSample / 8 (number of bytes per sample)
 
-	//wh.SampleRate = wh.SampleRate // "/ ss" sildim.!
+	wh.SampleRate = wh.SampleRate / (ss * 2) //"/ ss" sildim.!
 	array = append(array, int32ToBytes(wh.SampleRate)...)
 
-	//wh.ByteRate = wh.SampleRate * wh.NumChannels * wh.BitsPerSample / 8
 	wh.ByteRate = wh.SampleRate * wh.NumChannels * wh.BitsPerSample / 8
 	array = append(array, int32ToBytes(wh.ByteRate)...) // SampleRate * NumChannels * BitsPerSample / 8
 
@@ -68,19 +81,69 @@ func makeDataArray(taintedLoveArray_b *[]byte, wh *WaveHeader, ss int) *[]byte {
 	array = append(array, int16ToBytes(wh.BlockAlign)...) // NumChannels * BitsPerSample / 8 (number of bytes per sample)
 
 	array = append(array, int16ToBytes(wh.BitsPerSample)...)
-	fmt.Println("wh.BitsPerSample", wh.BitsPerSample)
+	//fmt.Println("wh.BitsPerSample", wh.BitsPerSample)
 
 	array = append(array, wh.Subchunk2ID...)
-	//wh.Subchunk2Size = len(array) - 44
-	wh.Subchunk2Size = (len(*taintedLoveArray_b) - 44) / ss
-	fmt.Println("wh.Subchunk2Size :", wh.Subchunk2Size)
+
+	//wh.Subchunk2Size = (len(*taintedLoveArray_b) - 44) / ss
+	//wh.Subchunk2Size = diziSonuSorgusu /
+	wh.Subchunk2Size = (diziSonuSorgusu / iterasyon) * (iterasyon / ss)
+	//fmt.Println("wh.Subchunk2Size :", wh.Subchunk2Size)
 	array = append(array, int32ToBytes(wh.Subchunk2Size)...)
 
-	for i := 0; i < ((len(*taintedLoveArray_b) - 44) / ss); i++ {
-		array = append(array, (*taintedLoveArray_b)[(i*ss)+44])
+	for i := 44; i < diziSonuSorgusu; i += iterasyon {
+		if diziSonuSorgusu == i {
+			break
+		}
+		for k := 0; k < (iterasyon / ss); k++ {
+			if diziSonuSorgusu == i {
+				break
+			}
+			array = append(array, (*taintedLoveArray_b)[i+k])
+			dataCount++
+		}
+
 	}
 
-	//fmt.Println(array)
+	/*
+		for i := 44; i < diziSonuSorgusu; i += iterasyon {
+			if diziSonuSorgusu == i {
+				break
+			}
+			for k := 0; k < (iterasyon / ss); k++ {
+				if diziSonuSorgusu == i {
+					break
+				}
+				array = append(array, (*taintedLoveArray_b)[i+k])
+				dataCount++
+			}
+
+		}
+
+			for i := 44; i < (len(*taintedLoveArray_b)); i += iterasyon {
+				if diziSonuSorgusu == i {
+					break
+				}
+				for k := 0; k < (iterasyon / ss); k++ {
+					if diziSonuSorgusu == i {
+						break
+					}
+					array = append(array, (*taintedLoveArray_b)[i+k])
+					dataCount++
+				}
+
+			}
+	*/
+
+	v := reflect.ValueOf(*wh)
+
+	values := make([]interface{}, v.NumField())
+
+	for i := 0; i < v.NumField(); i++ {
+		values[i] = v.Field(i).Interface()
+	}
+
+	fmt.Println(values)
 
 	//fmt.Println(array)
 
@@ -127,6 +190,7 @@ func bits16ToInt(b *[]byte) int {
 
 func readHeader(b []byte) WaveHeader {
 	hdr := WaveHeader{}
+	fmt.Println("\n  ----ANA SES DOSYASI (TAINTEDLOVE)----")
 	//----------Chunk id----------
 	chunkID := b[0:4]
 	//fmt.Println("ChunkID :")
@@ -142,7 +206,7 @@ func readHeader(b []byte) WaveHeader {
 	chunkSize := b[4:8]
 	hdr.ChunkSize = bits32ToInt(&chunkSize) // easier to work with ints
 	fmt.Println("chunkSize :", hdr.ChunkSize)
-	fmt.Println("chunkSize b[4:8]:", chunkSize)
+	//fmt.Println("chunkSize b[4:8]:", chunkSize)
 
 	//----------------------------
 
@@ -234,44 +298,53 @@ func int16ToBytes(i int) []byte {
 	return b
 }
 
+func Kur(newFileName *string, taintedLove_arr **[]byte, ss uint8) {
+
+	Create(*newFileName)                     //Yeni dosya olusturuldu.
+	arr := makeHeaderArray(*taintedLove_arr) //Yeni dosya icin set edilecek yeni bir dizi olusturuldu.
+	oldHeader := readHeader(*arr)
+	wArray := makeDataArray(*taintedLove_arr, &oldHeader, int(ss))
+	Write(wArray, *newFileName) //Yeni dosyanin icine, yeni dizi geçirildi.
+	fmt.Println("\n Dosya yazildi...")
+}
+
 func main() {
 
-	taintedLove_arr, err := ReadFile("./tone.wav") //sarki []byte array olarak okundu.
+	taintedLove_arr, err := ReadFile("./taintedLove.wav") //sarki []byte array olarak okundu.
 	if err != nil {
 		panic(err)
 	}
-	newFileName := "./asdas.wav" //Yeni dosyanin ismi.
-
-	Create(newFileName)                     //Yeni dosya olusturuldu.
-	arr := makeHeaderArray(taintedLove_arr) //Yeni dosya icin set edilecek yeni bir dizi olusturuldu.
-	oldHeader := readHeader(*arr)
-	wArray := makeDataArray(taintedLove_arr, &oldHeader, 32)
-	Write(wArray, newFileName) //Yeni dosyanin icine, yeni dizi geçirildi.
-
+	newFileName := "./asdasd.wav" //Yeni dosyanin ismi.
 	var limitingDegeri uint8
-	limitingDegeri = limitingDegeriGirisi(limitingDegeri)
+	limitingDegeri = 1
 
 	for {
 		if limitingDegeri != 0 {
 			switch limitingDegeri {
 			case 2:
-				fmt.Println("one")
+				Kur(&newFileName, &taintedLove_arr, limitingDegeri)
 				limitingDegeri = limitingDegeriGirisi(limitingDegeri)
+
 			case 4:
-				fmt.Println("two")
+				Kur(&newFileName, &taintedLove_arr, limitingDegeri)
 				limitingDegeri = limitingDegeriGirisi(limitingDegeri)
+
 			case 6:
-				fmt.Println("three")
+				Kur(&newFileName, &taintedLove_arr, limitingDegeri)
 				limitingDegeri = limitingDegeriGirisi(limitingDegeri)
+
 			case 8:
-				fmt.Println("three")
+				Kur(&newFileName, &taintedLove_arr, limitingDegeri)
 				limitingDegeri = limitingDegeriGirisi(limitingDegeri)
+
 			case 16:
-				fmt.Println("three")
+				Kur(&newFileName, &taintedLove_arr, limitingDegeri)
 				limitingDegeri = limitingDegeriGirisi(limitingDegeri)
+
 			case 32:
-				fmt.Println("three")
+				Kur(&newFileName, &taintedLove_arr, limitingDegeri)
 				limitingDegeri = limitingDegeriGirisi(limitingDegeri)
+
 			default:
 				fmt.Println("\n IZIN VERILEN DEGERLER -> (2,4,6,8,16,32)")
 				limitingDegeri = limitingDegeriGirisi(limitingDegeri)
