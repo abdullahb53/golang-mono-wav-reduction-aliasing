@@ -70,8 +70,9 @@ func makeDataArray(taintedLoveArray_b *[]byte, wh *WaveHeader, ss int) *[]byte {
 
 	wh.NumChannels = wh.NumChannels * wh.BitsPerSample / 8
 	array = append(array, int16ToBytes(wh.NumChannels)...) // NumChannels * BitsPerSample / 8 (number of bytes per sample)
-
-	wh.SampleRate = wh.SampleRate / (ss * 2) //"/ ss" sildim.!
+	fmt.Println("\n wh.Samplerate", wh.SampleRate, "ss->", ss, "\n")
+	wh.SampleRate = (wh.SampleRate / ((iterasyon / 8) * (ss * 2) / (iterasyon / 8))) //"/ ss" sildim.!
+	fmt.Println("\n wh.Samplerate", wh.SampleRate, "ss->", ss, "\n")
 	array = append(array, int32ToBytes(wh.SampleRate)...)
 
 	wh.ByteRate = wh.SampleRate * wh.NumChannels * wh.BitsPerSample / 8
@@ -87,7 +88,7 @@ func makeDataArray(taintedLoveArray_b *[]byte, wh *WaveHeader, ss int) *[]byte {
 
 	//wh.Subchunk2Size = (len(*taintedLoveArray_b) - 44) / ss
 	//wh.Subchunk2Size = diziSonuSorgusu /
-	wh.Subchunk2Size = (diziSonuSorgusu / iterasyon) * (iterasyon / ss)
+	wh.Subchunk2Size = (diziSonuSorgusu / iterasyon) * (iterasyon / ss) //CHUNK SİZE HESAPLANDI
 	//fmt.Println("wh.Subchunk2Size :", wh.Subchunk2Size)
 	array = append(array, int32ToBytes(wh.Subchunk2Size)...)
 
@@ -171,7 +172,7 @@ func bits32ToInt(b *[]byte) int {
 	if err != nil {
 		panic(err)
 	}
-	return int(payload) // easier to work with ints
+	return int(payload) // İNTLE ÇALIŞMAK DAHA KOLAY
 }
 
 func bits16ToInt(b *[]byte) int {
@@ -310,13 +311,16 @@ func Kur(newFileName *string, taintedLove_arr **[]byte, ss uint8) {
 
 func main() {
 
-	taintedLove_arr, err := ReadFile("./taintedLove.wav") //sarki []byte array olarak okundu.
+	taintedLove_arr, err := ReadFile("./gercek_ses_taintedlove.wav") //sarki []byte array olarak okundu.
 	if err != nil {
 		panic(err)
 	}
-	newFileName := "./asdasd.wav" //Yeni dosyanin ismi.
+	newFileName := "./uretilen_wav_dosyasi.wav" //Yeni dosyanin ismi.
 	var limitingDegeri uint8
 	limitingDegeri = 1
+
+	fmt.Println("->IZIN VERILEN DEGERLER -> (2,4,6,8,16,32)")
+	fmt.Scanln(&limitingDegeri)
 
 	for {
 		if limitingDegeri != 0 {
